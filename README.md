@@ -78,6 +78,19 @@ API endpoints:
 - Local: server on venue mini PC; guests access over venue Wi-Fi; screen via HDMI browser.
 - Hosting: domain + HTTPS; persistent DB and uploads (volume); tighter guardrails.
 
+### Free GitHub Pages deployment (frontend only)
+GitHub Pages cannot run the Node.js/Socket.IO server, but you can host the static **public** UI for free and point it to any reachable backend (Render/Railway/fly.io/VPS/local tunnel).
+
+1) Push this repo to GitHub and keep the default branch named `main`.
+2) In the repo, open **Settings → Pages** and set Source to **GitHub Actions**. The included workflow `.github/workflows/gh-pages.yml` publishes the `public` folder to the Pages environment on every push to `main`.
+3) Host the backend somewhere that exposes HTTPS and Socket.IO (CORS is already `*` here). Grab its base URL, e.g. `https://point-wall.onrender.com`.
+4) Tell the frontend to hit that backend:
+   - Add `?apiBase=https://point-wall.onrender.com` to your QR/links, **or**
+   - Run `localStorage.setItem('apiBase', 'https://point-wall.onrender.com')` once in the browser console on each device.
+5) Visit the Pages URL for each mode, e.g. `https://<user>.github.io/<repo>/guest/login.html?apiBase=...`.
+
+> Screen/admin/guest pages all read `apiBase` from the query string (or `localStorage`) and use the CDN Socket.IO client to talk to the remote server.
+
 ## Development Constraints
 - Freely iterate on UI/UX, wiring to existing endpoints, and realtime listeners.
 - Avoid altering core endpoint structure or DB schema without planned migrations.

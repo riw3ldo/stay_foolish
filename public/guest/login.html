@@ -201,6 +201,13 @@
   </div>
   <script>
     const params = new URLSearchParams(window.location.search);
+    const paramApi = params.get('apiBase') || params.get('api_base');
+    const storedApi = localStorage.getItem('apiBase');
+    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    if (paramApi) localStorage.setItem('apiBase', API_BASE);
+    const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
+    const pathBase = window.location.pathname.split('/guest/')[0];
+    const guestChatPath = `${pathBase}/guest/chat.html`;
     const eventInput = document.getElementById('event');
     const nicknameInput = document.getElementById('nickname');
     const disclaimerInput = document.getElementById('disclaimer');
@@ -227,7 +234,7 @@
       button.disabled = true;
       toast.textContent = 'Creating session...';
       try {
-        const res = await fetch('/api/public/session', {
+        const res = await apiFetch('/api/public/session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -243,7 +250,7 @@
         localStorage.setItem('point_nickname', nicknameInput.value.trim());
         localStorage.setItem('point_event', eventInput.value.trim());
         toast.textContent = 'Success! Redirecting to chat...';
-        setTimeout(() => window.location.href = '/guest/chat.html', 600);
+        setTimeout(() => window.location.href = guestChatPath, 600);
       } catch (err) {
         toast.textContent = err.message;
         button.disabled = false;
@@ -252,7 +259,7 @@
 
     async function applySettings() {
       try {
-        const res = await fetch('/api/settings');
+        const res = await apiFetch('/api/settings');
         const data = await res.json();
         brandTitle.textContent = data.brand.title || 'POINT';
         brandSubtitle.textContent = data.brand.subtitle || 'Live chat experience';

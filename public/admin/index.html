@@ -285,9 +285,9 @@
       <h3>Screen &amp; Guest Shortcuts</h3>
       <p class="caption">Pastikan entertaint screen siap: buka mode panggung atau uji akses guest.</p>
       <div class="quick-actions">
-        <a href="/screen/" target="_blank" rel="noopener"><button>Open Screen</button></a>
-        <a href="/guest/login.html" target="_blank" rel="noopener"><button>Guest Login</button></a>
-        <a href="/guest/chat.html" target="_blank" rel="noopener"><button>Guest Chat</button></a>
+        <a id="screenLink" href="/screen/" target="_blank" rel="noopener"><button>Open Screen</button></a>
+        <a id="guestLoginLink" href="/guest/login.html" target="_blank" rel="noopener"><button>Guest Login</button></a>
+        <a id="guestChatLink" href="/guest/chat.html" target="_blank" rel="noopener"><button>Guest Chat</button></a>
       </div>
       <div class="stat">
         <div class="label">Realtime status</div>
@@ -338,8 +338,16 @@
     </section>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-RlJ3JF5gf63HgNbUsVTNff7kwh28ykVfoCEN0z7LxyzKDn5XxhxL7sRKqGZo4PM5" crossorigin="anonymous"></script>
   <script>
+    const params = new URLSearchParams(window.location.search);
+    const paramApi = params.get('apiBase') || params.get('api_base');
+    const storedApi = localStorage.getItem('apiBase');
+    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    if (paramApi) localStorage.setItem('apiBase', API_BASE);
+    const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
+    const socketBase = API_BASE || undefined;
+    const pathBase = window.location.pathname.split('/admin/')[0];
     const roleEl = document.getElementById('role');
     const statusEl = document.getElementById('status');
     const loginBtn = document.getElementById('loginBtn');
@@ -363,10 +371,17 @@
     const staffRole = document.getElementById('staffRole');
     const staffActive = document.getElementById('staffActive');
     const createStaff = document.getElementById('createStaff');
+    const screenLink = document.getElementById('screenLink');
+    const guestLoginLink = document.getElementById('guestLoginLink');
+    const guestChatLink = document.getElementById('guestChatLink');
     let pendingCache = [];
     let token = '';
     let role = '';
     let selectedId = null;
+
+    screenLink.href = `${pathBase}/screen/`;
+    guestLoginLink.href = `${pathBase}/guest/login.html`;
+    guestChatLink.href = `${pathBase}/guest/chat.html`;
 
     const settingsEls = {
       brandTitle: document.getElementById('brandTitle'),
@@ -401,7 +416,7 @@
       const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
       setStatus('Logging in...');
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
@@ -420,7 +435,7 @@
     });
 
     async function loadPending() {
-      const res = await fetch('/api/mod/messages?status=pending', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch('/api/mod/messages?status=pending', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       pendingCache = data;
       renderPending();
@@ -462,7 +477,7 @@
     async function act(action) {
       if (!selectedId) return;
       setStatus(`${action}...`);
-      const res = await fetch(`/api/mod/messages/${selectedId}/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch(`/api/mod/messages/${selectedId}/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) { setStatus(data.error || 'Failed'); return; }
       setStatus(`${action}d`);
@@ -482,7 +497,7 @@
     }
 
     async function loadSettings() {
-      const res = await fetch('/api/settings');
+      const res = await apiFetch('/api/settings');
       const data = await res.json();
       settingsEls.brandTitle.value = data.brand.title;
       settingsEls.brandSubtitle.value = data.brand.subtitle;
@@ -510,7 +525,7 @@
         performer_visible: settingsEls.performerVisible.checked,
         auto_accept: settingsEls.autoAccept.checked
       };
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
@@ -520,7 +535,7 @@
     });
 
     document.getElementById('genQr').addEventListener('click', async () => {
-      const res = await fetch(`/api/admin/qrcodes?event_code=${encodeURIComponent(document.getElementById('qrEvent').value)}&table_ref=${encodeURIComponent(document.getElementById('qrTable').value)}`, {
+      const res = await apiFetch(`/api/admin/qrcodes?event_code=${encodeURIComponent(document.getElementById('qrEvent').value)}&table_ref=${encodeURIComponent(document.getElementById('qrTable').value)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -529,7 +544,7 @@
     });
 
     async function loadAudit() {
-      const res = await fetch('/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch('/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       document.getElementById('audit').textContent = data.map((row) => `${row.created_at} • ${row.actor} • ${row.action} ${row.details || ''}`).join('\n');
       if (data.length) {
@@ -550,7 +565,7 @@
 
     async function loadStaff() {
       if (role !== 'superadmin') return;
-      const res = await fetch('/api/admin/staff', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await apiFetch('/api/admin/staff', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) { setStatus(data.error || 'Cannot load staff'); return; }
       renderStaff(data);
@@ -589,7 +604,7 @@
     }
 
     async function updateStaff(id, payload, toast = 'Updated') {
-      const res = await fetch(`/api/admin/staff/${id}`, {
+      const res = await apiFetch(`/api/admin/staff/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
@@ -631,7 +646,7 @@
           role: staffRole.value,
           active: staffActive.checked
         };
-        const res = await fetch('/api/admin/staff', {
+        const res = await apiFetch('/api/admin/staff', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload)
@@ -679,7 +694,7 @@
       });
     }
 
-    const socket = io();
+    const socket = io(socketBase, { transports: ['websocket'] });
     socket.on('settings:update', loadSettings);
     socket.on('message:approved', loadPending);
     socket.on('connect', () => { setStatus('Connected'); socketState.textContent = 'Connected'; });

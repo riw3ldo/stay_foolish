@@ -83,8 +83,15 @@
     <img id="performerImg" alt="Performer" />
     <div class="label">Performer</div>
   </div>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-RlJ3JF5gf63HgNbUsVTNff7kwh28ykVfoCEN0z7LxyzKDn5XxhxL7sRKqGZo4PM5" crossorigin="anonymous"></script>
   <script>
+    const params = new URLSearchParams(window.location.search);
+    const paramApi = params.get('apiBase') || params.get('api_base');
+    const storedApi = localStorage.getItem('apiBase');
+    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    if (paramApi) localStorage.setItem('apiBase', API_BASE);
+    const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
+    const socket = io(API_BASE || undefined, { transports: ['websocket'] });
     const messagesEl = document.getElementById('messages');
     const logo = document.getElementById('logo');
     const title = document.getElementById('title');
@@ -94,7 +101,6 @@
     const videoWrap = document.getElementById('videoWrap');
     const performer = document.getElementById('performer');
     const performerImg = document.getElementById('performerImg');
-    const socket = io();
 
     function addMessage(msg) {
       const div = document.createElement('div');
@@ -109,7 +115,7 @@
     }
 
     async function loadMessages() {
-      const res = await fetch('/api/screen/messages?limit=10');
+      const res = await apiFetch('/api/screen/messages?limit=10');
       const data = await res.json();
       messagesEl.innerHTML = '';
       data.forEach(addMessage);
@@ -137,7 +143,7 @@
     }
 
     async function loadSettings() {
-      const res = await fetch('/api/settings');
+      const res = await apiFetch('/api/settings');
       const data = await res.json();
       applySettings(data);
     }
