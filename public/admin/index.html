@@ -172,6 +172,30 @@
     .staff-card .controls { display: flex; flex-wrap: wrap; gap: 6px; }
     .staff-card select { background: rgba(0, 0, 0, 0.35); color: #fff; border-radius: 10px; border: 1px solid var(--stroke); padding: 6px 8px; }
 
+    .api-bar {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      left: 16px;
+      display: grid;
+      grid-template-columns: 1.6fr auto;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(7, 10, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      z-index: 10;
+    }
+
+    .api-label { color: #cdd8ff; font-size: 13px; margin-bottom: 6px; }
+
+    @media (max-width: 640px) {
+      .api-bar { grid-template-columns: 1fr; position: static; margin-top: 12px; }
+    }
+
     @media (max-width: 1024px) {
       main { grid-template-columns: 1fr; }
       .actions button { flex: 1 1 auto; }
@@ -338,15 +362,23 @@
     </section>
   </div>
 
+  <div class="api-bar" id="apiBar" style="display:none;">
+    <div>
+      <div class="api-label">Set your backend base URL (untuk GitHub Pages / evaluasi jarak jauh)</div>
+      <input id="apiInput" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.25);color:#fff;" placeholder="https://your-backend.example.com" />
+    </div>
+    <button id="apiSave">Save &amp; reload</button>
+  </div>
+
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-RlJ3JF5gf63HgNbUsVTNff7kwh28ykVfoCEN0z7LxyzKDn5XxhxL7sRKqGZo4PM5" crossorigin="anonymous"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const paramApi = params.get('apiBase') || params.get('api_base');
     const storedApi = localStorage.getItem('apiBase');
-    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    let API_BASE = (paramApi || storedApi || '').replace(/\/$/, '');
     if (paramApi) localStorage.setItem('apiBase', API_BASE);
     const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
-    const socketBase = API_BASE || undefined;
+    const needsApiBase = !API_BASE && (window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:');
     const pathBase = window.location.pathname.split('/admin/')[0];
     const roleEl = document.getElementById('role');
     const statusEl = document.getElementById('status');
@@ -374,10 +406,14 @@
     const screenLink = document.getElementById('screenLink');
     const guestLoginLink = document.getElementById('guestLoginLink');
     const guestChatLink = document.getElementById('guestChatLink');
+    const apiBar = document.getElementById('apiBar');
+    const apiInput = document.getElementById('apiInput');
+    const apiSave = document.getElementById('apiSave');
     let pendingCache = [];
     let token = '';
     let role = '';
     let selectedId = null;
+    let socket;
 
     screenLink.href = `${pathBase}/screen/`;
     guestLoginLink.href = `${pathBase}/guest/login.html`;
@@ -395,6 +431,27 @@
     };
 
     function setStatus(text) { statusEl.textContent = text; }
+
+    function requireApiBase(next) {
+      if (!needsApiBase) {
+        apiBar.style.display = 'none';
+        loginBtn.disabled = false;
+        next?.();
+        return;
+      }
+      loginBtn.disabled = true;
+      setStatus('Set API base URL to connect');
+      apiBar.style.display = 'grid';
+      apiInput.value = storedApi || '';
+      apiSave.addEventListener('click', () => {
+        const val = apiInput.value.trim().replace(/\/$/, '');
+        if (!val) return;
+        localStorage.setItem('apiBase', val);
+        const url = new URL(window.location.href);
+        url.searchParams.set('apiBase', val);
+        window.location.href = url.toString();
+      });
+    }
 
     function buildRoleChips() {
       const map = {
@@ -694,11 +751,14 @@
       });
     }
 
-    const socket = io(socketBase, { transports: ['websocket'] });
-    socket.on('settings:update', loadSettings);
-    socket.on('message:approved', loadPending);
-    socket.on('connect', () => { setStatus('Connected'); socketState.textContent = 'Connected'; });
-    socket.on('disconnect', () => { socketState.textContent = 'Reconnecting...'; });
+    function ensureSocket() {
+      if (socket || (!API_BASE && needsApiBase)) return;
+      socket = io(API_BASE || undefined, { transports: ['websocket'] });
+      socket.on('settings:update', loadSettings);
+      socket.on('message:approved', loadPending);
+      socket.on('connect', () => { setStatus('Connected'); socketState.textContent = 'Connected'; });
+      socket.on('disconnect', () => { socketState.textContent = 'Reconnecting...'; });
+    }
 
     if (refreshAll) {
       refreshAll.addEventListener('click', () => {
@@ -709,6 +769,10 @@
         setStatus('Refreshed');
       });
     }
+
+    requireApiBase(() => {
+      ensureSocket();
+    });
   </script>
 </body>
 </html>

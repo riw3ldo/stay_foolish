@@ -173,6 +173,30 @@
       text-align: center;
       opacity: 0.8;
     }
+
+    .api-bar {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      left: 16px;
+      display: grid;
+      grid-template-columns: 1.6fr auto;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(7, 10, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      z-index: 10;
+    }
+
+    .api-label { color: #cdd8ff; font-size: 13px; margin-bottom: 6px; }
+
+    @media (max-width: 640px) {
+      .api-bar { grid-template-columns: 1fr; position: static; margin-top: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -199,13 +223,21 @@
     </div>
     <div class="footer">Powered by POINT Pool &amp; Lounge • Stay respectful &amp; enjoy the night</div>
   </div>
+  <div class="api-bar" id="apiBar" style="display:none;">
+    <div>
+      <div class="api-label">Set your backend base URL (for GitHub Pages / remote eval)</div>
+      <input id="apiInput" class="field" placeholder="https://your-backend.example.com" />
+    </div>
+    <button class="cta" id="apiSave">Save &amp; reload</button>
+  </div>
   <script>
     const params = new URLSearchParams(window.location.search);
     const paramApi = params.get('apiBase') || params.get('api_base');
     const storedApi = localStorage.getItem('apiBase');
-    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    let API_BASE = (paramApi || storedApi || '').replace(/\/$/, '');
     if (paramApi) localStorage.setItem('apiBase', API_BASE);
     const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
+    const needsApiBase = !API_BASE && (window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:');
     const pathBase = window.location.pathname.split('/guest/')[0];
     const guestChatPath = `${pathBase}/guest/chat.html`;
     const eventInput = document.getElementById('event');
@@ -217,6 +249,9 @@
     const brandTitle = document.getElementById('brandTitle');
     const brandSubtitle = document.getElementById('brandSubtitle');
     const backdrop = document.querySelector('.backdrop');
+    const apiBar = document.getElementById('apiBar');
+    const apiInput = document.getElementById('apiInput');
+    const apiSave = document.getElementById('apiSave');
 
     eventInput.value = params.get('event') || '';
     const tableRef = params.get('table') || '';
@@ -250,7 +285,7 @@
         localStorage.setItem('point_nickname', nicknameInput.value.trim());
         localStorage.setItem('point_event', eventInput.value.trim());
         toast.textContent = 'Success! Redirecting to chat...';
-        setTimeout(() => window.location.href = guestChatPath, 600);
+        setTimeout(() => (window.location.href = guestChatPath), 600);
       } catch (err) {
         toast.textContent = err.message;
         button.disabled = false;
@@ -275,7 +310,25 @@
       }
     }
 
-    applySettings();
+    function requireApiBase(next) {
+      if (!needsApiBase) {
+        apiBar.style.display = 'none';
+        next();
+        return;
+      }
+      apiBar.style.display = 'grid';
+      apiInput.value = storedApi || '';
+      apiSave.addEventListener('click', () => {
+        const val = apiInput.value.trim().replace(/\/$/, '');
+        if (!val) return;
+        localStorage.setItem('apiBase', val);
+        const url = new URL(window.location.href);
+        url.searchParams.set('apiBase', val);
+        window.location.href = url.toString();
+      });
+    }
+
+    requireApiBase(applySettings);
   </script>
 </body>
 </html>

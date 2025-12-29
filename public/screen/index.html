@@ -65,6 +65,30 @@
       #header { top: 12px; left: 12px; right: 12px; }
       #performer { top: 12px; right: 12px; }
     }
+
+    .api-bar {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      left: 16px;
+      display: grid;
+      grid-template-columns: 1.6fr auto;
+      gap: 10px;
+      padding: 12px;
+      background: rgba(7, 10, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      z-index: 10;
+    }
+
+    .api-label { color: #cdd8ff; font-size: 13px; margin-bottom: 6px; }
+
+    @media (max-width: 640px) {
+      .api-bar { grid-template-columns: 1fr; position: static; margin-top: 12px; }
+    }
   </style>
 </head>
 <body>
@@ -83,15 +107,22 @@
     <img id="performerImg" alt="Performer" />
     <div class="label">Performer</div>
   </div>
+  <div class="api-bar" id="apiBar" style="display:none;">
+    <div>
+      <div class="api-label">Set your backend base URL (for GitHub Pages / remote eval)</div>
+      <input id="apiInput" style="width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(0,0,0,0.25);color:#fff;" placeholder="https://your-backend.example.com" />
+    </div>
+    <button id="apiSave">Save &amp; reload</button>
+  </div>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-RlJ3JF5gf63HgNbUsVTNff7kwh28ykVfoCEN0z7LxyzKDn5XxhxL7sRKqGZo4PM5" crossorigin="anonymous"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const paramApi = params.get('apiBase') || params.get('api_base');
     const storedApi = localStorage.getItem('apiBase');
-    const API_BASE = paramApi ? paramApi.replace(/\/$/, '') : (storedApi || '');
+    let API_BASE = (paramApi || storedApi || '').replace(/\/$/, '');
     if (paramApi) localStorage.setItem('apiBase', API_BASE);
     const apiFetch = (path, opts) => fetch(`${API_BASE}${path}`, opts || {});
-    const socket = io(API_BASE || undefined, { transports: ['websocket'] });
+    const needsApiBase = !API_BASE && (window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:');
     const messagesEl = document.getElementById('messages');
     const logo = document.getElementById('logo');
     const title = document.getElementById('title');
@@ -101,6 +132,10 @@
     const videoWrap = document.getElementById('videoWrap');
     const performer = document.getElementById('performer');
     const performerImg = document.getElementById('performerImg');
+    const apiBar = document.getElementById('apiBar');
+    const apiInput = document.getElementById('apiInput');
+    const apiSave = document.getElementById('apiSave');
+    let socket;
 
     function addMessage(msg) {
       const div = document.createElement('div');
@@ -148,11 +183,38 @@
       applySettings(data);
     }
 
-    socket.on('message:approved', addMessage);
-    socket.on('settings:update', applySettings);
+    function ensureSocket() {
+      if (socket || (!API_BASE && needsApiBase)) return;
+      socket = io(API_BASE || undefined, { transports: ['websocket'] });
+      socket.on('message:approved', addMessage);
+      socket.on('settings:update', applySettings);
+    }
 
-    loadSettings();
-    loadMessages();
+    function requireApiBase(next) {
+      if (!needsApiBase) {
+        apiBar.style.display = 'none';
+        next();
+        return;
+      }
+      apiBar.style.display = 'grid';
+      apiInput.value = storedApi || '';
+      apiSave.addEventListener('click', () => {
+        const val = apiInput.value.trim().replace(/\/$/, '');
+        if (!val) return;
+        localStorage.setItem('apiBase', val);
+        const url = new URL(window.location.href);
+        url.searchParams.set('apiBase', val);
+        window.location.href = url.toString();
+      });
+    }
+
+    function boot() {
+      ensureSocket();
+      loadSettings();
+      loadMessages();
+    }
+
+    requireApiBase(boot);
   </script>
 </body>
 </html>

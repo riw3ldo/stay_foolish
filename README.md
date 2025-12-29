@@ -88,7 +88,8 @@ GitHub Pages cannot run the Node.js/Socket.IO server, but you can host the stati
 4) Tell the frontend to hit that backend:
    - Add `?apiBase=https://point-wall.onrender.com` to your QR/links, **or**
    - Run `localStorage.setItem('apiBase', 'https://point-wall.onrender.com')` once in the browser console on each device.
-5) Visit the Pages URL for each mode, e.g. `https://<user>.github.io/<repo>/guest/login.html?apiBase=...`.
+5) Or, open the Pages URL for any mode and use the new "Set backend base URL" banner to paste your remote API once; it saves to `localStorage` and reloads with `apiBase` set.
+6) Visit the Pages URL for each mode, e.g. `https://<user>.github.io/<repo>/guest/login.html?apiBase=...`.
 
 > Screen/admin/guest pages all read `apiBase` from the query string (or `localStorage`) and use the CDN Socket.IO client to talk to the remote server.
 
