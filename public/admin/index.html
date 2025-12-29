@@ -603,16 +603,21 @@
       });
     }
 
-    async function updateStaff(id, payload, toast = 'Updated') {
-      const res = await apiFetch(`/api/admin/staff/${id}`, {
+    async function settingsOp(kind, data) {
+      const res = await apiFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ op: { kind, data } })
       });
-      const data = await res.json();
-      if (!res.ok) { setStatus(data.error || 'Update failed'); return; }
+      const json = await res.json();
+      return { res, json };
+    }
+
+    async function updateStaff(id, payload, toast = 'Updated') {
+      const { res, json } = await settingsOp('staff:update', { id, ...payload });
+      if (!res.ok) { setStatus(json.error || 'Update failed'); return; }
       setStatus(toast);
-      loadStaff();
+      renderStaff(json.staff || []);
     }
 
     if (staffList) {
@@ -646,20 +651,15 @@
           role: staffRole.value,
           active: staffActive.checked
         };
-        const res = await apiFetch('/api/admin/staff', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok) { setStatus(data.error || 'Create failed'); return; }
-        setStatus('Staff created');
-        staffUsername.value = '';
-        staffPassword.value = '';
-        staffActive.checked = true;
-        loadStaff();
-      });
-    }
+      const { res, json } = await settingsOp('staff:create', payload);
+      if (!res.ok) { setStatus(json.error || 'Create failed'); return; }
+      setStatus('Staff created');
+      staffUsername.value = '';
+      staffPassword.value = '';
+      staffActive.checked = true;
+      renderStaff(json.staff || []);
+    });
+  }
 
     searchInput.addEventListener('input', renderPending);
 

@@ -55,6 +55,7 @@ API endpoints:
 - `GET /api/admin/staff` (SuperAdmin only)
 - `POST /api/admin/staff` (SuperAdmin only)
 - `PUT /api/admin/staff/:id` (SuperAdmin only)
+- `PUT /api/settings` supports `op.kind` for SuperAdmin staff ops (`staff:create`, `staff:update`) alongside branding payloads
 
 ## Realtime Events
 - `settings:update` pushes global settings to screen/admin/guest.

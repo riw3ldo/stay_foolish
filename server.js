@@ -183,6 +183,13 @@ function saveSettings(payload) {
   return getSettings();
 }
 
+function listStaff() {
+  return db
+    .prepare('SELECT id, username, role, active FROM staff ORDER BY role ASC, username ASC')
+    .all()
+    .map((row) => ({ ...row, active: Boolean(row.active) }));
+}
+
 function addAudit(actor, action, details = '') {
   db.prepare('INSERT INTO audit_logs (actor, action, details) VALUES (?, ?, ?)').run(actor, action, details);
 }
@@ -451,6 +458,59 @@ app.post('/api/settings', requireAuth(['admin', 'superadmin']), (req, res) => {
 });
 
 app.put('/api/settings', requireAuth(['admin', 'superadmin']), (req, res) => {
+  const { op } = req.body || {};
+  if (op?.kind) {
+    if (req.user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'SuperAdmin only' });
+    }
+
+    if (op.kind === 'staff:create') {
+      const { username, password, role, active = true } = op.data || {};
+      if (!username || !password || !role || !STAFF_ROLES.includes(role)) {
+        return res.status(400).json({ error: 'Invalid staff payload' });
+      }
+      const exists = db.prepare('SELECT id FROM staff WHERE username = ?').get(username);
+      if (exists) {
+        return res.status(409).json({ error: 'Username already exists' });
+      }
+      const hashed = bcrypt.hashSync(password, 10);
+      db.prepare('INSERT INTO staff (username, password, role, active) VALUES (?, ?, ?, ?)').run(
+        username,
+        hashed,
+        role,
+        active ? 1 : 0
+      );
+      addAudit(req.user.username, 'staff:create', `${username} (${role}) via settings op`);
+      return res.json({ ok: true, staff: listStaff() });
+    }
+
+    if (op.kind === 'staff:update') {
+      const { id, role, active, password } = op.data || {};
+      if (!id) return res.status(400).json({ error: 'Missing staff id' });
+      const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
+      if (!staff) {
+        return res.status(404).json({ error: 'Staff not found' });
+      }
+      if (role && !STAFF_ROLES.includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+      }
+      const updates = { role: staff.role, active: staff.active, password: staff.password };
+      if (role) updates.role = role;
+      if (active !== undefined) updates.active = active ? 1 : 0;
+      if (password) updates.password = bcrypt.hashSync(password, 10);
+      db.prepare('UPDATE staff SET role = ?, active = ?, password = ? WHERE id = ?').run(
+        updates.role,
+        updates.active,
+        updates.password,
+        id
+      );
+      addAudit(req.user.username, 'staff:update', `${staff.username} -> ${updates.role}/${updates.active} via settings op`);
+      return res.json({ ok: true, staff: listStaff() });
+    }
+
+    return res.status(400).json({ error: 'Unknown op.kind' });
+  }
+
   const updated = saveSettings(req.body);
   emitSettingsUpdate(updated);
   addAudit(req.user.username, 'settings:update');
