@@ -23,6 +23,7 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const MESSAGE_MAX_LENGTH = parseInt(process.env.MESSAGE_MAX_LENGTH || '200', 10);
 const MESSAGE_COOLDOWN_MS = parseInt(process.env.MESSAGE_COOLDOWN_MS || '5000', 10);
+const STAFF_ROLES = ['superadmin', 'admin', 'moderator'];
 
 app.use(helmet());
 app.use(cors());
@@ -257,6 +258,61 @@ app.post('/api/auth/login', (req, res) => {
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '12h' });
   addAudit(user.username, 'login', user.role);
   res.json({ token, role: user.role, username: user.username });
+});
+
+app.get('/api/admin/staff', requireAuth(['superadmin']), (req, res) => {
+  const staff = db
+    .prepare('SELECT id, username, role, active FROM staff ORDER BY role ASC, username ASC')
+    .all()
+    .map((row) => ({ ...row, active: Boolean(row.active) }));
+  res.json(staff);
+});
+
+app.post('/api/admin/staff', requireAuth(['superadmin']), (req, res) => {
+  const { username, password, role, active = true } = req.body;
+  if (!username || !password || !role) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+  if (!STAFF_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  const exists = db.prepare('SELECT id FROM staff WHERE username = ?').get(username);
+  if (exists) {
+    return res.status(409).json({ error: 'Username already exists' });
+  }
+  const hashed = bcrypt.hashSync(password, 10);
+  db.prepare('INSERT INTO staff (username, password, role, active) VALUES (?, ?, ?, ?)').run(
+    username,
+    hashed,
+    role,
+    active ? 1 : 0
+  );
+  addAudit(req.user.username, 'staff:create', `${username} (${role})`);
+  res.json({ id: db.prepare('SELECT last_insert_rowid() as id').get().id, username, role, active: Boolean(active) });
+});
+
+app.put('/api/admin/staff/:id', requireAuth(['superadmin']), (req, res) => {
+  const { id } = req.params;
+  const { role, active, password } = req.body;
+  const staff = db.prepare('SELECT * FROM staff WHERE id = ?').get(id);
+  if (!staff) {
+    return res.status(404).json({ error: 'Staff not found' });
+  }
+  if (role && !STAFF_ROLES.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  const updates = { role: staff.role, active: staff.active, password: staff.password };
+  if (role) updates.role = role;
+  if (active !== undefined) updates.active = active ? 1 : 0;
+  if (password) updates.password = bcrypt.hashSync(password, 10);
+  db.prepare('UPDATE staff SET role = ?, active = ?, password = ? WHERE id = ?').run(
+    updates.role,
+    updates.active,
+    updates.password,
+    id
+  );
+  addAudit(req.user.username, 'staff:update', `${staff.username} -> ${updates.role}/${updates.active}`);
+  res.json({ id: staff.id, username: staff.username, role: updates.role, active: Boolean(updates.active) });
 });
 
 app.post('/api/public/session', (req, res) => {

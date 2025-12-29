@@ -52,6 +52,9 @@ API endpoints:
 - `POST/PUT /api/settings`
 - `GET /api/admin/qrcodes`
 - `GET /api/admin/audit`
+- `GET /api/admin/staff` (SuperAdmin only)
+- `POST /api/admin/staff` (SuperAdmin only)
+- `PUT /api/admin/staff/:id` (SuperAdmin only)
 
 ## Realtime Events
 - `settings:update` pushes global settings to screen/admin/guest.

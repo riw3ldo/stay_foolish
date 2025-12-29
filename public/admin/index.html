@@ -160,6 +160,18 @@
     .quick-actions a { text-decoration: none; flex: 1; }
     .quick-actions a button { width: 100%; }
 
+    .staff-form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .staff-form .full { grid-column: 1 / -1; }
+    .staff-list { display: grid; gap: 10px; max-height: 320px; overflow: auto; }
+    .staff-card { padding: 12px; border: 1px solid var(--stroke); border-radius: 12px; background: rgba(255, 255, 255, 0.05); display: grid; gap: 6px; }
+    .staff-card .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .staff-card .name { font-weight: 700; letter-spacing: 0.3px; }
+    .badge { padding: 4px 8px; border-radius: 10px; border: 1px solid var(--stroke); background: rgba(255, 255, 255, 0.08); font-size: 12px; color: var(--muted); }
+    .badge.good { background: rgba(34, 197, 94, 0.12); color: #a7f3d0; border-color: rgba(34, 197, 94, 0.3); }
+    .badge.warn { background: rgba(248, 113, 113, 0.12); color: #fecdd3; border-color: rgba(248, 113, 113, 0.3); }
+    .staff-card .controls { display: flex; flex-wrap: wrap; gap: 6px; }
+    .staff-card select { background: rgba(0, 0, 0, 0.35); color: #fff; border-radius: 10px; border: 1px solid var(--stroke); padding: 6px 8px; }
+
     @media (max-width: 1024px) {
       main { grid-template-columns: 1fr; }
       .actions button { flex: 1 1 auto; }
@@ -302,6 +314,28 @@
         <button id="refreshAll">Refresh data</button>
       </div>
     </section>
+
+    <section class="panel role-guard" data-roles="superadmin" id="staffPanel">
+      <h3>Staff Management</h3>
+      <p class="caption">Buat admin/moderator baru, reset password, dan aktif/nonaktifkan akses.</p>
+      <div class="staff-form">
+        <input id="staffUsername" placeholder="username" />
+        <input id="staffPassword" placeholder="password" type="password" />
+        <select id="staffRole">
+          <option value="admin">Admin</option>
+          <option value="moderator">Moderator</option>
+        </select>
+        <label class="full"><input type="checkbox" id="staffActive" checked /> Active</label>
+        <div class="actions full">
+          <button id="createStaff">Create Staff</button>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="label">Hint</div>
+        <div class="value">Only SuperAdmin dapat membuat/reset akun. Admin &amp; moderator tidak melihat menu ini.</div>
+      </div>
+      <div class="staff-list" id="staffList"></div>
+    </section>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -323,6 +357,12 @@
     const socketState = document.getElementById('socketState');
     const lastAudit = document.getElementById('lastAudit');
     const refreshAll = document.getElementById('refreshAll');
+    const staffList = document.getElementById('staffList');
+    const staffUsername = document.getElementById('staffUsername');
+    const staffPassword = document.getElementById('staffPassword');
+    const staffRole = document.getElementById('staffRole');
+    const staffActive = document.getElementById('staffActive');
+    const createStaff = document.getElementById('createStaff');
     let pendingCache = [];
     let token = '';
     let role = '';
@@ -373,6 +413,9 @@
       loadPending(); loadSettings();
       if (role !== 'moderator') {
         loadAudit();
+      }
+      if (role === 'superadmin') {
+        loadStaff();
       }
     });
 
@@ -505,6 +548,104 @@
       buildRoleChips();
     }
 
+    async function loadStaff() {
+      if (role !== 'superadmin') return;
+      const res = await fetch('/api/admin/staff', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.error || 'Cannot load staff'); return; }
+      renderStaff(data);
+    }
+
+    function renderStaff(list) {
+      staffList.innerHTML = '';
+      if (!list.length) {
+        staffList.innerHTML = '<div class="chip">Belum ada staff lain</div>';
+        return;
+      }
+      list.forEach((member) => {
+        const card = document.createElement('div');
+        card.className = 'staff-card';
+        card.dataset.id = member.id;
+        card.innerHTML = `
+          <div class="row">
+            <div>
+              <div class="name">${member.username}</div>
+              <div class="chip">${member.role}</div>
+            </div>
+            <div class="badge ${member.active ? 'good' : 'warn'}">${member.active ? 'Active' : 'Inactive'}</div>
+          </div>
+          <div class="controls">
+            <select class="role-select" data-id="${member.id}">
+              <option value="superadmin" ${member.role === 'superadmin' ? 'selected' : ''}>SuperAdmin</option>
+              <option value="admin" ${member.role === 'admin' ? 'selected' : ''}>Admin</option>
+              <option value="moderator" ${member.role === 'moderator' ? 'selected' : ''}>Moderator</option>
+            </select>
+            <button class="secondary toggle-active" data-id="${member.id}" data-active="${member.active}">${member.active ? 'Deactivate' : 'Activate'}</button>
+            <button class="secondary reset-pass" data-id="${member.id}">Reset Password</button>
+          </div>
+        `;
+        staffList.appendChild(card);
+      });
+    }
+
+    async function updateStaff(id, payload, toast = 'Updated') {
+      const res = await fetch(`/api/admin/staff/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.error || 'Update failed'); return; }
+      setStatus(toast);
+      loadStaff();
+    }
+
+    if (staffList) {
+      staffList.addEventListener('change', (e) => {
+        if (e.target.classList.contains('role-select')) {
+          const id = e.target.dataset.id;
+          updateStaff(id, { role: e.target.value }, 'Role updated');
+        }
+      });
+      staffList.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target.classList.contains('toggle-active')) {
+          const id = target.dataset.id;
+          const current = target.dataset.active === 'true';
+          updateStaff(id, { active: !current }, !current ? 'Activated' : 'Deactivated');
+        }
+        if (target.classList.contains('reset-pass')) {
+          const newPass = prompt('New password for this staff?');
+          if (newPass) {
+            updateStaff(target.dataset.id, { password: newPass }, 'Password reset');
+          }
+        }
+      });
+    }
+
+    if (createStaff) {
+      createStaff.addEventListener('click', async () => {
+        const payload = {
+          username: staffUsername.value.trim(),
+          password: staffPassword.value,
+          role: staffRole.value,
+          active: staffActive.checked
+        };
+        const res = await fetch('/api/admin/staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) { setStatus(data.error || 'Create failed'); return; }
+        setStatus('Staff created');
+        staffUsername.value = '';
+        staffPassword.value = '';
+        staffActive.checked = true;
+        loadStaff();
+      });
+    }
+
     searchInput.addEventListener('input', renderPending);
 
     document.addEventListener('keydown', (e) => {
@@ -549,6 +690,7 @@
         loadPending();
         loadSettings();
         if (role !== 'moderator') loadAudit();
+        if (role === 'superadmin') loadStaff();
         setStatus('Refreshed');
       });
     }
