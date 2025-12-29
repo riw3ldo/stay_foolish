@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POINT Staff Dashboard</title>
+  <style>
+    :root {
+      --bg: #070913;
+      --panel: rgba(255, 255, 255, 0.06);
+      --stroke: rgba(255, 255, 255, 0.14);
+      --accent: #8f5bff;
+      --accent-2: #ff7ee2;
+      --muted: #cdd8ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 20% 10%, rgba(255, 126, 226, 0.25), transparent 40%),
+        radial-gradient(circle at 80% 10%, rgba(73, 219, 255, 0.2), transparent 32%),
+        linear-gradient(140deg, #0c0c1e, #050814 60%, #02050d);
+      color: #f8fafc;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      padding: 16px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0.25;
+      filter: blur(10px) saturate(1.1);
+      z-index: 0;
+      transition: background-image 0.4s ease;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(5, 5, 15, 0.8), rgba(4, 6, 12, 0.9));
+      z-index: 0;
+    }
+
+    header {
+      position: relative;
+      z-index: 1;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(14px);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand .mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(145deg, #ff7ee2, #7c5bff, #38d7ff);
+      color: #05050f;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .brand h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+    .brand .subtitle { color: var(--muted); margin-top: 4px; font-size: 13px; }
+
+    .status-stack { text-align: right; }
+    .status-stack .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.07);
+      color: #dbe8ff;
+      font-size: 13px;
+    }
+
+    .panel {
+      position: relative;
+      z-index: 1;
+      background: var(--panel);
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(14px);
+    }
+
+    .panel h3 { margin: 0 0 6px; }
+    .panel p.caption { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+
+    .auth-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .auth-row input { flex: 1; min-width: 160px; }
+
+    input, textarea { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(0, 0, 0, 0.35); color: #fff; }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(143, 91, 255, 0.25); }
+
+    button { background: linear-gradient(120deg, var(--accent), var(--accent-2), #45d4ff); border: none; padding: 10px 14px; border-radius: 12px; color: #0a0a16; font-weight: 800; cursor: pointer; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35); }
+    button.secondary { background: rgba(255, 255, 255, 0.1); color: #f1f5f9; border: 1px solid var(--stroke); box-shadow: none; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    main { position: relative; z-index: 1; display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
+    .grid-lower { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+
+    .queue-panel .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .hint { font-size: 12px; color: #c084fc; }
+
+    .queue { display: grid; gap: 8px; max-height: 60vh; overflow-y: auto; padding-right: 6px; }
+    .queue-item { text-align: left; border-radius: 14px; padding: 12px; border: 1px solid var(--stroke); background: linear-gradient(120deg, rgba(255, 126, 226, 0.15), rgba(94, 123, 255, 0.18)); cursor: pointer; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); transition: transform 0.15s ease, border-color 0.2s ease; }
+    .queue-item:hover { transform: translateY(-1px); border-color: #b0c5ff; }
+    .queue-item.active { border-color: #fff; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4); }
+    .queue-item .time { color: var(--muted); font-size: 12px; }
+    .queue-item .nick { font-weight: 700; letter-spacing: 0.3px; }
+    .queue-item .preview { color: #e2e8f0; margin-top: 4px; }
+
+    .detail-card { background: rgba(255, 255, 255, 0.05); border: 1px dashed var(--stroke); border-radius: 16px; padding: 14px; min-height: 140px; display: grid; gap: 8px; }
+    .detail-card.empty { display: grid; place-items: center; color: var(--muted); text-align: center; }
+    .detail-card strong { font-size: 18px; }
+    .detail-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .actions button { flex: 1; min-width: 140px; }
+
+    .admin-only.hidden { display: none !important; }
+
+    pre#audit { max-height: 240px; overflow: auto; white-space: pre-wrap; background: rgba(0, 0, 0, 0.35); border-radius: 12px; padding: 10px; border: 1px solid var(--stroke); }
+
+    @media (max-width: 1024px) {
+      main { grid-template-columns: 1fr; }
+      .actions button { flex: 1 1 auto; }
+      .queue { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="overlay"></div>
+  <header>
+    <div class="brand">
+      <div class="mark">PT</div>
+      <div>
+        <h1>POINT Dashboard</h1>
+        <div class="subtitle">Moderate messages • Control the screen</div>
+      </div>
+    </div>
+    <div class="status-stack">
+      <div class="pill">Role: <span id="role">-</span></div>
+      <div class="pill" id="status">Offline</div>
+    </div>
+  </header>
+
+  <section class="panel">
+    <h3>Staff Login</h3>
+    <p class="caption">Single gate for SuperAdmin / Admin / Moderator</p>
+    <div class="auth-row" id="login">
+      <input id="username" placeholder="username" />
+      <input id="password" placeholder="password" type="password" />
+      <button id="loginBtn">Login</button>
+    </div>
+  </section>
+
+  <main>
+    <section class="panel queue-panel">
+      <div class="panel-head">
+        <div>
+          <h3>Pending Queue</h3>
+          <p class="caption">Approve/reject fast to keep the wall flowing.</p>
+        </div>
+        <div class="hint">Hotkeys: A = approve, R = reject, / = search</div>
+      </div>
+      <input id="search" placeholder="Search nickname or text" />
+      <div class="queue" id="pending"></div>
+    </section>
+
+    <section class="panel detail-panel">
+      <h3>Message Detail</h3>
+      <p class="caption">Select an item from the queue to review.</p>
+      <div id="detail" class="detail-card empty">No message selected</div>
+      <div class="actions">
+        <button id="approveBtn" disabled>Approve</button>
+        <button id="rejectBtn" class="secondary" disabled>Reject</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="grid-lower">
+    <section class="panel admin-only">
+      <h3>Branding &amp; Screen</h3>
+      <p class="caption">Update once, reflected on guest, screen, and dashboard.</p>
+      <label>Title</label>
+      <input id="brandTitle" />
+      <label>Subtitle</label>
+      <input id="brandSubtitle" />
+      <label>Logo URL</label>
+      <input id="logoUrl" />
+      <label>Background URL</label>
+      <input id="bgUrl" />
+      <label>Video URL</label>
+      <input id="videoUrl" />
+      <label>Performer URL</label>
+      <input id="performerUrl" />
+      <label><input type="checkbox" id="performerVisible" /> Show performer</label>
+      <label><input type="checkbox" id="autoAccept" /> Auto accept</label>
+      <div class="actions">
+        <button id="saveSettings">Save</button>
+      </div>
+    </section>
+
+    <section class="panel admin-only">
+      <h3>QR Codes</h3>
+      <p class="caption">Generate guest QR with embedded event &amp; table.</p>
+      <label>Event Code</label>
+      <input id="qrEvent" value="POINT" />
+      <label>Table</label>
+      <input id="qrTable" placeholder="A1" />
+      <div class="actions">
+        <button id="genQr">Generate</button>
+      </div>
+      <div id="qrResult"></div>
+    </section>
+
+    <section class="panel admin-only">
+      <h3>Audit Log</h3>
+      <p class="caption">Read-only history of actions.</p>
+      <pre id="audit"></pre>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const roleEl = document.getElementById('role');
+    const statusEl = document.getElementById('status');
+    const loginBtn = document.getElementById('loginBtn');
+    const pendingEl = document.getElementById('pending');
+    const searchInput = document.getElementById('search');
+    const adminSections = document.querySelectorAll('.admin-only');
+    const approveBtn = document.getElementById('approveBtn');
+    const rejectBtn = document.getElementById('rejectBtn');
+    const detailEl = document.getElementById('detail');
+    const backdrop = document.querySelector('.backdrop');
+    let pendingCache = [];
+    let token = '';
+    let role = '';
+    let selectedId = null;
+
+    const settingsEls = {
+      brandTitle: document.getElementById('brandTitle'),
+      brandSubtitle: document.getElementById('brandSubtitle'),
+      logoUrl: document.getElementById('logoUrl'),
+      bgUrl: document.getElementById('bgUrl'),
+      videoUrl: document.getElementById('videoUrl'),
+      performerUrl: document.getElementById('performerUrl'),
+      performerVisible: document.getElementById('performerVisible'),
+      autoAccept: document.getElementById('autoAccept')
+    };
+
+    function setStatus(text) { statusEl.textContent = text; }
+
+    loginBtn.addEventListener('click', async () => {
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      setStatus('Logging in...');
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.error || 'Login failed'); return; }
+      token = data.token; role = data.role; roleEl.textContent = data.role; setStatus('Logged in');
+      applyRole();
+      loadPending(); loadSettings();
+      if (role !== 'moderator') {
+        loadAudit();
+      }
+    });
+
+    async function loadPending() {
+      const res = await fetch('/api/mod/messages?status=pending', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      pendingCache = data;
+      renderPending();
+    }
+
+    function renderPending() {
+      const q = searchInput.value.trim().toLowerCase();
+      pendingEl.innerHTML = '';
+      const filtered = pendingCache.filter((msg) => !q || msg.text.toLowerCase().includes(q) || msg.nickname.toLowerCase().includes(q));
+      if (!filtered.length) {
+        selectMessage(null);
+      }
+      filtered.forEach((msg, idx) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'queue-item';
+        card.dataset.id = msg.id;
+        card.innerHTML = `<div class="nick">${msg.nickname}</div><div class="preview">${msg.text}</div><div class="time">${new Date(msg.created_at).toLocaleTimeString()}</div>`;
+        if ((!selectedId && idx === 0) || selectedId === msg.id) {
+          selectMessage(msg);
+          card.classList.add('active');
+        }
+        card.addEventListener('click', () => selectMessage(msg));
+        pendingEl.appendChild(card);
+      });
+      updateActionState();
+    }
+
+    function selectMessage(msg) {
+      selectedId = msg?.id || null;
+      detailEl.classList.toggle('empty', !msg);
+      detailEl.innerHTML = msg
+        ? `<strong>${msg.nickname}</strong><div>${msg.text}</div><div class="detail-meta"><span class="pill">${new Date(msg.created_at).toLocaleString()}</span><span class="pill">ID ${msg.id}</span></div>`
+        : 'No message selected';
+      document.querySelectorAll('.queue-item').forEach((el) => el.classList.toggle('active', parseInt(el.dataset.id, 10) === selectedId));
+      updateActionState();
+    }
+
+    async function act(action) {
+      if (!selectedId) return;
+      setStatus(`${action}...`);
+      const res = await fetch(`/api/mod/messages/${selectedId}/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.error || 'Failed'); return; }
+      setStatus(`${action}d`);
+      selectedId = null;
+      loadPending();
+      detailEl.classList.add('empty');
+      detailEl.textContent = 'Select another message';
+    }
+
+    approveBtn.addEventListener('click', () => act('approve'));
+    rejectBtn.addEventListener('click', () => act('reject'));
+
+    function updateActionState() {
+      const hasSelection = Boolean(selectedId);
+      approveBtn.disabled = !hasSelection;
+      rejectBtn.disabled = !hasSelection;
+    }
+
+    async function loadSettings() {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      settingsEls.brandTitle.value = data.brand.title;
+      settingsEls.brandSubtitle.value = data.brand.subtitle;
+      settingsEls.logoUrl.value = data.assets.logo_url;
+      settingsEls.bgUrl.value = data.assets.bg_url;
+      settingsEls.videoUrl.value = data.assets.video_url;
+      settingsEls.performerUrl.value = data.assets.performer_url;
+      settingsEls.performerVisible.checked = data.performer_visible;
+      settingsEls.autoAccept.checked = data.auto_accept;
+      if (data.assets.bg_url) {
+        backdrop.style.backgroundImage = `url(${data.assets.bg_url})`;
+      }
+    }
+
+    document.getElementById('saveSettings').addEventListener('click', async () => {
+      const payload = {
+        brand: { title: settingsEls.brandTitle.value, subtitle: settingsEls.brandSubtitle.value },
+        assets: {
+          logo_url: settingsEls.logoUrl.value,
+          bg_url: settingsEls.bgUrl.value,
+          video_url: settingsEls.videoUrl.value,
+          performer_url: settingsEls.performerUrl.value
+        },
+        performer_visible: settingsEls.performerVisible.checked,
+        auto_accept: settingsEls.autoAccept.checked
+      };
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      setStatus(res.ok ? 'Settings saved' : data.error || 'Failed');
+    });
+
+    document.getElementById('genQr').addEventListener('click', async () => {
+      const res = await fetch(`/api/admin/qrcodes?event_code=${encodeURIComponent(document.getElementById('qrEvent').value)}&table_ref=${encodeURIComponent(document.getElementById('qrTable').value)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) { setStatus(data.error || 'Failed'); return; }
+      document.getElementById('qrResult').innerHTML = `<p>${data.url}</p><img src="${data.qrcode}" alt="QR" width="180" />`;
+    });
+
+    async function loadAudit() {
+      const res = await fetch('/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      document.getElementById('audit').textContent = data.map((row) => `${row.created_at} • ${row.actor} • ${row.action} ${row.details || ''}`).join('\n');
+    }
+
+    function applyRole() {
+      adminSections.forEach((sec) => {
+        sec.classList.toggle('hidden', role === 'moderator');
+      });
+    }
+
+    searchInput.addEventListener('input', renderPending);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && document.activeElement !== searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+      }
+      if (['a', 'A', 'r', 'R'].includes(e.key) && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        if (!selectedId && pendingCache.length) {
+          selectMessage(pendingCache[0]);
+        }
+        if (e.key.toLowerCase() === 'a') act('approve');
+        if (e.key.toLowerCase() === 'r') act('reject');
+      }
+    });
+
+    const socket = io();
+    socket.on('settings:update', loadSettings);
+    socket.on('message:approved', loadPending);
+    socket.on('connect', () => setStatus('Connected'));
+  </script>
+</body>
+</html>

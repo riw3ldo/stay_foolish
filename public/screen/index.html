@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POINT Live Wall</title>
+  <style>
+    :root {
+      --ink: #040712;
+      --stroke: rgba(255, 255, 255, 0.18);
+      --accent: #ff7ee2;
+      --accent-2: #6bc7ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 126, 226, 0.25), transparent 45%),
+        radial-gradient(circle at 80% 10%, rgba(79, 225, 255, 0.2), transparent 40%),
+        linear-gradient(145deg, #0b0520, #050915 60%, #02050d);
+      color: #fff;
+      font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+      overflow: hidden;
+      min-height: 100vh;
+    }
+
+    #bg { position: fixed; inset: 0; background-size: cover; background-position: center; filter: blur(10px) saturate(1.2); opacity: 0.32; z-index: -2; transition: background-image 0.4s ease; }
+    #videoWrap { position: fixed; inset: 0; overflow: hidden; z-index: -2; filter: blur(14px) brightness(0.4) saturate(1.1); display: none; }
+    #bgVideo { width: 100%; height: 100%; object-fit: cover; }
+    #layer { position: fixed; inset: 0; background: linear-gradient(180deg, rgba(7, 6, 16, 0.7), rgba(5, 5, 12, 0.92)); z-index: -1; }
+
+    #header {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--stroke);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    #logo { width: 96px; height: 96px; object-fit: contain; filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.45)); display: none; }
+    #title { font-size: 34px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }
+    #subtitle { font-size: 16px; color: #c8d7ff; }
+
+    #messages { position: absolute; bottom: 24px; left: 24px; right: 24px; display: flex; flex-direction: column-reverse; gap: 12px; }
+    .bubble { align-self: flex-start; padding: 14px 18px; border-radius: 18px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--stroke); max-width: 60%; backdrop-filter: blur(12px); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35); position: relative; overflow: hidden; }
+    .bubble::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 15% 20%, rgba(255, 126, 226, 0.3), transparent 60%); z-index: 0; }
+    .bubble strong { color: #a8fffe; font-size: 18px; position: relative; z-index: 1; }
+    .bubble .text { position: relative; z-index: 1; display: block; margin-top: 4px; font-size: 18px; }
+    .bubble.highlight { border-color: var(--accent); transform: translateX(8px) scale(1.01); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 30px rgba(255, 126, 226, 0.35); }
+
+    #performer { position: absolute; top: 24px; right: 24px; text-align: center; background: rgba(255, 255, 255, 0.07); border: 1px solid var(--stroke); padding: 12px 14px; border-radius: 16px; box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35); backdrop-filter: blur(12px); display: none; }
+    #performer img { width: 140px; height: 140px; object-fit: cover; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.7); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45); }
+    #performer .label { margin-top: 8px; color: #d6c7ff; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    @media (max-width: 720px) {
+      #messages .bubble { max-width: 90%; }
+      #header { top: 12px; left: 12px; right: 12px; }
+      #performer { top: 12px; right: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="videoWrap"><video id="bgVideo" muted loop autoplay playsinline></video></div>
+  <div id="layer"></div>
+  <div id="header">
+    <img id="logo" alt="Logo" />
+    <div>
+      <div id="title">POINT Live Wall</div>
+      <div id="subtitle">Feel the vibe</div>
+    </div>
+  </div>
+  <div id="messages"></div>
+  <div id="performer">
+    <img id="performerImg" alt="Performer" />
+    <div class="label">Performer</div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const logo = document.getElementById('logo');
+    const title = document.getElementById('title');
+    const subtitle = document.getElementById('subtitle');
+    const bg = document.getElementById('bg');
+    const bgVideo = document.getElementById('bgVideo');
+    const videoWrap = document.getElementById('videoWrap');
+    const performer = document.getElementById('performer');
+    const performerImg = document.getElementById('performerImg');
+    const socket = io();
+
+    function addMessage(msg) {
+      const div = document.createElement('div');
+      div.className = 'bubble';
+      div.innerHTML = `<strong>${msg.nickname}</strong><span class="text">${msg.text}</span>`;
+      messagesEl.prepend(div);
+      requestAnimationFrame(() => div.classList.add('highlight'));
+      setTimeout(() => div.classList.remove('highlight'), 15000);
+      while (messagesEl.children.length > 10) {
+        messagesEl.removeChild(messagesEl.lastChild);
+      }
+    }
+
+    async function loadMessages() {
+      const res = await fetch('/api/screen/messages?limit=10');
+      const data = await res.json();
+      messagesEl.innerHTML = '';
+      data.forEach(addMessage);
+    }
+
+    function applySettings(s) {
+      title.textContent = s.brand.title || 'POINT Live Wall';
+      subtitle.textContent = s.brand.subtitle || '';
+      logo.style.display = s.assets.logo_url ? 'block' : 'none';
+      if (s.assets.logo_url) logo.src = s.assets.logo_url;
+      bg.style.backgroundImage = s.assets.bg_url ? `url(${s.assets.bg_url})` : '';
+      if (s.assets.video_url) {
+        bgVideo.src = s.assets.video_url;
+        videoWrap.style.display = 'block';
+      } else {
+        bgVideo.removeAttribute('src');
+        videoWrap.style.display = 'none';
+      }
+      if (s.performer_visible && s.assets.performer_url) {
+        performerImg.src = s.assets.performer_url;
+        performer.style.display = 'block';
+      } else {
+        performer.style.display = 'none';
+      }
+    }
+
+    async function loadSettings() {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      applySettings(data);
+    }
+
+    socket.on('message:approved', addMessage);
+    socket.on('settings:update', applySettings);
+
+    loadSettings();
+    loadMessages();
+  </script>
+</body>
+</html>

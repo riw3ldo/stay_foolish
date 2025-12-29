@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>POINT Guest Login</title>
+  <style>
+    :root {
+      --ink: #0f1024;
+      --card: rgba(255, 255, 255, 0.08);
+      --stroke: rgba(255, 255, 255, 0.18);
+      --accent: #9c4df4;
+      --accent-2: #6ec7ff;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+      --glass: blur(16px);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #fff;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 90, 221, 0.3), transparent 40%),
+        radial-gradient(circle at 80% 10%, rgba(102, 240, 255, 0.25), transparent 35%),
+        linear-gradient(135deg, #14051f, #0c132b 60%, #040712);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .backdrop {
+      position: absolute;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0.35;
+      filter: blur(6px) saturate(1.1);
+      z-index: 0;
+      transition: background-image 0.4s ease;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(11, 13, 30, 0.7), rgba(10, 5, 20, 0.85));
+      z-index: 0;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      width: min(420px, 100%);
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+    }
+
+    .brand {
+      text-align: center;
+      display: grid;
+      gap: 6px;
+    }
+
+    .brand img {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.45));
+    }
+
+    .brand .title {
+      font-size: 28px;
+      letter-spacing: 2px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .brand .subtitle {
+      color: #c6d4ff;
+      font-size: 14px;
+    }
+
+    .card {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      backdrop-filter: var(--glass);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 12px;
+      color: #b8a6ff;
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .field {
+      margin-top: 6px;
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--stroke);
+      background: rgba(255, 255, 255, 0.04);
+      color: #fff;
+      font-size: 15px;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .field:focus {
+      outline: none;
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 0 0 3px rgba(156, 77, 244, 0.15);
+    }
+
+    .disclaimer {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin-top: 14px;
+      font-size: 13px;
+      color: #d6e2ff;
+    }
+
+    .cta {
+      width: 100%;
+      padding: 13px;
+      margin-top: 18px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(120deg, #ff7ee2, #8e5dff, #3acbff);
+      color: #0c0c18;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.3px;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.2s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    .cta:hover:not(:disabled) { transform: translateY(-1px); }
+    .cta:active:not(:disabled) { transform: translateY(1px); }
+    .cta:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .toast {
+      margin-top: 12px;
+      color: #8be9ff;
+      min-height: 20px;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    .footer {
+      margin-top: 6px;
+      color: #9fb3ff;
+      font-size: 12px;
+      text-align: center;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="overlay"></div>
+  <div class="shell">
+    <div class="brand">
+      <img id="logo" alt="Logo" style="display:none;" />
+      <div class="title" id="brandTitle">POINT</div>
+      <div class="subtitle" id="brandSubtitle">Live chat experience</div>
+    </div>
+    <div class="card">
+      <p class="eyebrow">Join the wall</p>
+      <label>Event Code</label>
+      <input class="field" id="event" type="text" placeholder="e.g. POINT" />
+      <label>Nickname</label>
+      <input class="field" id="nickname" type="text" placeholder="Your name" />
+      <label class="disclaimer">
+        <input id="disclaimer" type="checkbox" />
+        <span>I am responsible for any text I submit. Keep it fun, respectful, and safe for everyone in the venue.</span>
+      </label>
+      <button class="cta" id="confirm" disabled>Confirm</button>
+      <div class="toast" id="toast"></div>
+    </div>
+    <div class="footer">Powered by POINT Pool &amp; Lounge • Stay respectful &amp; enjoy the night</div>
+  </div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const eventInput = document.getElementById('event');
+    const nicknameInput = document.getElementById('nickname');
+    const disclaimerInput = document.getElementById('disclaimer');
+    const button = document.getElementById('confirm');
+    const toast = document.getElementById('toast');
+    const logo = document.getElementById('logo');
+    const brandTitle = document.getElementById('brandTitle');
+    const brandSubtitle = document.getElementById('brandSubtitle');
+    const backdrop = document.querySelector('.backdrop');
+
+    eventInput.value = params.get('event') || '';
+    const tableRef = params.get('table') || '';
+
+    function validate() {
+      const ok = eventInput.value.trim() && nicknameInput.value.trim() && disclaimerInput.checked;
+      button.disabled = !ok;
+    }
+
+    eventInput.addEventListener('input', validate);
+    nicknameInput.addEventListener('input', validate);
+    disclaimerInput.addEventListener('change', validate);
+
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      toast.textContent = 'Creating session...';
+      try {
+        const res = await fetch('/api/public/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_code: eventInput.value.trim(),
+            nickname: nicknameInput.value.trim(),
+            table_ref: tableRef,
+            disclaimer: disclaimerInput.checked
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        localStorage.setItem('point_session', data.token);
+        localStorage.setItem('point_nickname', nicknameInput.value.trim());
+        localStorage.setItem('point_event', eventInput.value.trim());
+        toast.textContent = 'Success! Redirecting to chat...';
+        setTimeout(() => window.location.href = '/guest/chat.html', 600);
+      } catch (err) {
+        toast.textContent = err.message;
+        button.disabled = false;
+      }
+    });
+
+    async function applySettings() {
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        brandTitle.textContent = data.brand.title || 'POINT';
+        brandSubtitle.textContent = data.brand.subtitle || 'Live chat experience';
+        if (data.assets.logo_url) {
+          logo.src = data.assets.logo_url;
+          logo.style.display = 'block';
+        }
+        if (data.assets.bg_url) {
+          backdrop.style.backgroundImage = `url(${data.assets.bg_url})`;
+        }
+      } catch (e) {
+        // non-blocking
+      }
+    }
+
+    applySettings();
+  </script>
+</body>
+</html>
