@@ -144,8 +144,21 @@
     .actions button { flex: 1; min-width: 140px; }
 
     .admin-only.hidden { display: none !important; }
+    .role-guard { display: none; }
+    .role-guard.visible { display: block; }
 
     pre#audit { max-height: 240px; overflow: auto; white-space: pre-wrap; background: rgba(0, 0, 0, 0.35); border-radius: 12px; padding: 10px; border: 1px solid var(--stroke); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 6px 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(255, 255, 255, 0.05); font-size: 12px; color: var(--muted); }
+
+    .stat { display: grid; gap: 4px; padding: 10px; border-radius: 12px; border: 1px solid var(--stroke); background: rgba(255, 255, 255, 0.06); }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .value { font-weight: 700; }
+
+    .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-actions a { text-decoration: none; flex: 1; }
+    .quick-actions a button { width: 100%; }
 
     @media (max-width: 1024px) {
       main { grid-template-columns: 1fr; }
@@ -206,9 +219,19 @@
   </main>
 
   <div class="grid-lower">
-    <section class="panel admin-only">
+    <section class="panel role-guard" data-roles="superadmin admin moderator">
+      <h3>Role &amp; Access</h3>
+      <p class="caption">Setiap peran punya pintu akses berbeda, pastikan crew login sesuai tugas.</p>
+      <div class="chips" id="roleChips"></div>
+      <div class="stat">
+        <div class="label">Menu terlihat</div>
+        <div class="value" id="menuSummary">-</div>
+      </div>
+    </section>
+
+    <section class="panel role-guard admin-only" data-roles="superadmin admin">
       <h3>Branding &amp; Screen</h3>
-      <p class="caption">Update once, reflected on guest, screen, and dashboard.</p>
+      <p class="caption">Update sekali, langsung sinkron ke guest, screen, dan dashboard.</p>
       <label>Title</label>
       <input id="brandTitle" />
       <label>Subtitle</label>
@@ -226,11 +249,16 @@
       <div class="actions">
         <button id="saveSettings">Save</button>
       </div>
+      <div class="stat" id="screenReady">
+        <div class="label">Screen readiness</div>
+        <div class="value" id="readySummary">Checking...</div>
+        <div class="chips" id="readyBadges"></div>
+      </div>
     </section>
 
-    <section class="panel admin-only">
+    <section class="panel role-guard admin-only" data-roles="superadmin admin">
       <h3>QR Codes</h3>
-      <p class="caption">Generate guest QR with embedded event &amp; table.</p>
+      <p class="caption">Generate guest QR dengan event &amp; meja untuk dibagikan ke tamu.</p>
       <label>Event Code</label>
       <input id="qrEvent" value="POINT" />
       <label>Table</label>
@@ -241,10 +269,38 @@
       <div id="qrResult"></div>
     </section>
 
-    <section class="panel admin-only">
+    <section class="panel role-guard" data-roles="superadmin admin moderator">
+      <h3>Screen &amp; Guest Shortcuts</h3>
+      <p class="caption">Pastikan entertaint screen siap: buka mode panggung atau uji akses guest.</p>
+      <div class="quick-actions">
+        <a href="/screen/" target="_blank" rel="noopener"><button>Open Screen</button></a>
+        <a href="/guest/login.html" target="_blank" rel="noopener"><button>Guest Login</button></a>
+        <a href="/guest/chat.html" target="_blank" rel="noopener"><button>Guest Chat</button></a>
+      </div>
+      <div class="stat">
+        <div class="label">Realtime status</div>
+        <div class="value" id="socketState">Waiting...</div>
+      </div>
+    </section>
+
+    <section class="panel role-guard admin-only" data-roles="superadmin admin">
       <h3>Audit Log</h3>
       <p class="caption">Read-only history of actions.</p>
       <pre id="audit"></pre>
+    </section>
+
+    <section class="panel role-guard" data-roles="superadmin">
+      <h3>SuperAdmin Control</h3>
+      <p class="caption">Gatekeeper untuk tim: jaga branding, pantau audit, dan pastikan moderator aman.</p>
+      <div class="stat"><div class="label">Aktivitas terakhir</div><div class="value" id="lastAudit">-</div></div>
+      <div class="chips">
+        <span class="chip">SuperAdmin bisa: audit, branding, QR</span>
+        <span class="chip">Admin: branding, QR, audit read</span>
+        <span class="chip">Moderator: moderasi saja</span>
+      </div>
+      <div class="actions">
+        <button id="refreshAll">Refresh data</button>
+      </div>
     </section>
   </div>
 
@@ -260,6 +316,13 @@
     const rejectBtn = document.getElementById('rejectBtn');
     const detailEl = document.getElementById('detail');
     const backdrop = document.querySelector('.backdrop');
+    const roleChips = document.getElementById('roleChips');
+    const menuSummary = document.getElementById('menuSummary');
+    const readySummary = document.getElementById('readySummary');
+    const readyBadges = document.getElementById('readyBadges');
+    const socketState = document.getElementById('socketState');
+    const lastAudit = document.getElementById('lastAudit');
+    const refreshAll = document.getElementById('refreshAll');
     let pendingCache = [];
     let token = '';
     let role = '';
@@ -277,6 +340,22 @@
     };
 
     function setStatus(text) { statusEl.textContent = text; }
+
+    function buildRoleChips() {
+      const map = {
+        superadmin: ['Moderasi pesan', 'Ubah branding & screen', 'Generate QR', 'Audit log'],
+        admin: ['Moderasi pesan', 'Ubah branding & screen', 'Generate QR', 'Audit log (read-only)'],
+        moderator: ['Moderasi pesan']
+      };
+      roleChips.innerHTML = '';
+      (map[role] || []).forEach((item) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = item;
+        roleChips.appendChild(chip);
+      });
+      menuSummary.textContent = (map[role] || []).join(' • ') || 'Login to unlock menus';
+    }
 
     loginBtn.addEventListener('click', async () => {
       const username = document.getElementById('username').value;
@@ -373,6 +452,7 @@
       if (data.assets.bg_url) {
         backdrop.style.backgroundImage = `url(${data.assets.bg_url})`;
       }
+      updateReadiness(data);
     }
 
     document.getElementById('saveSettings').addEventListener('click', async () => {
@@ -409,12 +489,20 @@
       const res = await fetch('/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       document.getElementById('audit').textContent = data.map((row) => `${row.created_at} • ${row.actor} • ${row.action} ${row.details || ''}`).join('\n');
+      if (data.length) {
+        lastAudit.textContent = `${data[0].created_at} • ${data[0].actor} • ${data[0].action}`;
+      }
     }
 
     function applyRole() {
       adminSections.forEach((sec) => {
         sec.classList.toggle('hidden', role === 'moderator');
       });
+      document.querySelectorAll('[data-roles]').forEach((el) => {
+        const allowed = (el.dataset.roles || '').split(' ');
+        el.classList.toggle('visible', allowed.includes(role));
+      });
+      buildRoleChips();
     }
 
     searchInput.addEventListener('input', renderPending);
@@ -433,10 +521,37 @@
       }
     });
 
+    function updateReadiness(data) {
+      const badges = [];
+      if (data.assets.logo_url) badges.push('Logo siap');
+      if (data.assets.bg_url) badges.push('Background siap');
+      if (data.assets.video_url) badges.push('Video siap');
+      if (data.assets.performer_url && data.performer_visible) badges.push('Performer tampil');
+      badges.push(data.auto_accept ? 'Auto-accept ON' : 'Moderasi ON');
+      readySummary.textContent = badges.length ? 'Siap tampil' : 'Lengkapi aset untuk screen';
+      readyBadges.innerHTML = '';
+      badges.forEach((b) => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = b;
+        readyBadges.appendChild(chip);
+      });
+    }
+
     const socket = io();
     socket.on('settings:update', loadSettings);
     socket.on('message:approved', loadPending);
-    socket.on('connect', () => setStatus('Connected'));
+    socket.on('connect', () => { setStatus('Connected'); socketState.textContent = 'Connected'; });
+    socket.on('disconnect', () => { socketState.textContent = 'Reconnecting...'; });
+
+    if (refreshAll) {
+      refreshAll.addEventListener('click', () => {
+        loadPending();
+        loadSettings();
+        if (role !== 'moderator') loadAudit();
+        setStatus('Refreshed');
+      });
+    }
   </script>
 </body>
 </html>
